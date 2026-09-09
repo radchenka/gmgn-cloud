@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+paper_state.json
+paper_trades.jsonl
+events.jsonl
+signals_in.jsonl
+.queue_offset
+*.session
+.env
+.env.*
