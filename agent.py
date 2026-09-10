@@ -46,6 +46,12 @@ POLL_SEC = 5     # как часто опрашивать цену в live (се
 #   "skip"          — не входить вообще (только чистые откаты -10%)
 #   "market"        — войти по рынку всегда, даже выше сигнала (догон)
 ENTRY_MODE = "market-below"
+# фильтр «перегретых» сигналов: гипотеза — buy5m под 0.90+ = истощение → раг.
+# берём только buy5m <= BUY5M_MAX. Настраивается env (Railway Variables).
+BUY5M_MAX = float(os.environ.get("BUY5M_MAX", "0.85"))
+# аварийный выход по коллапсу ликвидности (раг): если текущая liq упала ниже
+# entry_liq * RUG_FRAC — выходим немедленно, не ждём -50% стопа.
+RUG_FRAC = float(os.environ.get("RUG_FRAC", "0.5"))
 
 QUEUE = os.path.join(HERE, "signals_in.jsonl")
 TRADES = os.path.join(HERE, "paper_trades.jsonl")
@@ -95,6 +101,7 @@ class Trade:
     tp_price: float = 0.0
     sl_price: float = 0.0
     peak: float = 0.0
+    entry_liq: float = 0.0        # ликвидность на момент входа (для раг-выхода)
     exit_price: float = 0.0
     exit_ts: float = 0.0
     exit_reason: str = ""
@@ -119,6 +126,7 @@ class Trade:
         self.tp_price = price * (1 + self.tp)
         self.sl_price = price * (1 - self.sl)
         self.peak = price
+        self.entry_liq = self.liq_usd          # запоминаем ликвидность входа
         self.filled_limit = filled_limit
         self.state = "open"
 
@@ -162,6 +170,9 @@ class Trade:
             # price available: original order SL -> TP -> TIME (matches backtest)
             if px_ok:
                 self.peak = max(self.peak, price)
+                # раг: ликвидность обвалилась -> выходим немедленно по рынку
+                if self.entry_liq and 0 < self.liq_usd < self.entry_liq * RUG_FRAC:
+                    self._close(price, now, "RUG"); return True
                 if price <= self.sl_price:
                     self._close(self.sl_price, now, "SL"); return True
                 if price >= self.tp_price:
@@ -352,6 +363,14 @@ def run_live(rule="A", notify_enabled=False, executor=None, entry_mode=None, pol
                     except Exception:
                         continue
                     sym = sig.get("symbol", "?")
+                    # фильтр «перегретых»: buy5m выше кэпа -> чаще раг, пропускаем
+                    try:
+                        b5 = float(sig.get("buy5m"))
+                        if b5 > BUY5M_MAX:
+                            emit("hot_skip", symbol=sym, buy5m=b5)
+                            continue
+                    except (TypeError, ValueError):
+                        pass
                     # skip stale signals (e.g. leftover queue after a sleep/restart)
                     try:
                         age_min = (time.time() -

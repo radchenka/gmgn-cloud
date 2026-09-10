@@ -63,7 +63,7 @@ tr.win td{background:linear-gradient(90deg,var(--grnbg),transparent 40%)}
 tr.loss td{background:linear-gradient(90deg,var(--redbg),transparent 40%)}
 .tag{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:600}
 .t-TP{background:var(--grnbg);color:var(--grn)}.t-SL{background:var(--redbg);color:var(--red)}
-.t-TIME{background:#1c2330;color:var(--acc)}
+.t-TIME{background:#1c2330;color:var(--acc)}.t-RUG{background:var(--redbg);color:var(--red)}
 .st-open{color:var(--grn)}.st-wait{color:var(--warn)}
 .bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:4px;width:110px}
 .bar>i{display:block;height:100%;background:var(--acc)}
@@ -144,6 +144,7 @@ function render(s){
     else if(e.kind==='entry'){ico='🟢';txt=`<b>ВХОД</b> ${e.symbol} по <b>${e.via}</b> @ ${g(e.price)} <span class="sub">TP ${g(e.tp)} · SL ${g(e.sl)}</span>`;}
     else if(e.kind==='exit'){const w=e.pnl>0;ico=w?'✅':'🔻';txt=`<b>ВЫХОД</b> ${e.symbol} <span class="tag t-${e.reason}">${e.reason}</span> @ ${g(e.price)} · <span class="${cls(e.net)}">${pct(e.net)} = ${money(e.pnl)}</span> <span class="sub">держал ${e.held_min}м</span>`;}
     else if(e.kind==='skip'){ico='⚪';txt=`<b>ПРОПУСК</b> ${e.symbol} <span class="sub">${e.reason==='NODIP'?'не было отката −10%':e.reason}</span>`;}
+    else if(e.kind==='hot_skip'){ico='🔥';txt=`пропуск ${e.symbol} <span class="sub">перегрет: buy5m ${e.buy5m}</span>`;}
     else if(e.kind==='stale_skip'){ico='⏭';txt=`пропуск ${e.symbol} <span class="sub">протухший сигнал, ${e.age_min}м</span>`;}
     else if(e.kind==='no_price_skip'){ico='⏭';txt=`пропуск ${e.symbol} <span class="sub">нет цены</span>`;}
     else txt=e.kind;
