@@ -22,7 +22,7 @@ DATA_DIR = os.environ.get("DATA_DIR", HERE)
 os.makedirs(DATA_DIR, exist_ok=True)
 
 QUEUE = os.path.join(HERE, "signals_in.jsonl")           # транзиентная труба (рядом с producer)
-OFFSET = os.path.join(DATA_DIR, ".queue_offset_multi")
+OFFSET = os.path.join(HERE, ".queue_offset_multi")       # офсет рядом с очередью (эфемерный, сбрасывается вместе)
 INDEX = os.path.join(DATA_DIR, "strategies.json")
 FLOW = os.path.join(DATA_DIR, "flow_log.jsonl")          # intra-trade поток по токенам
 
