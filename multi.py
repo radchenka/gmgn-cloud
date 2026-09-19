@@ -54,6 +54,8 @@ STRATEGIES = [
      "dip": 0, "wait": 0, "tp": 0.25, "sl": 0.50, "window": 12, "entry": "market"},
     {"name": "mkt_tp25_w20", "label": "Рынок · TP+25% · 20м",
      "dip": 0, "wait": 0, "tp": 0.25, "sl": 0.50, "window": 20, "entry": "market"},
+    {"name": "limit_tp25_w20", "label": "Лимит −10% · TP+25% · 20м",
+     "dip": 0.10, "wait": 5, "tp": 0.25, "sl": 0.50, "window": 20, "entry": "skip"},
 ]
 
 STAKE = AG.STAKE_USD
