@@ -35,7 +35,7 @@ from executor import PaperExecutor, GMGNExecutor
 _PAPER = PaperExecutor(EXEC)               # дефолтный исполнитель (бумага)
 
 RULES = {
-    "A": {"dip": 0.10, "wait_min": 5, "tp": 0.25, "sl": 0.50, "window_min": 20},
+    "A": {"dip": 0.10, "wait_min": 5, "tp": 0.25, "sl": 0.50, "window_min": 12},
     "B": {"dip": 0.10, "wait_min": 5, "tp": 0.40, "sl": 0.50, "window_min": 20},
 }
 STAKE_USD = 100.0

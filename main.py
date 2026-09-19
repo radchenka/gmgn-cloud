@@ -17,7 +17,7 @@ import os, sys, subprocess, time, signal, atexit
 HERE = os.path.dirname(os.path.abspath(__file__))
 PY = sys.executable
 RULE = os.environ.get("RULE", "A")
-ENTRY = os.environ.get("ENTRY", "market-below")
+ENTRY = os.environ.get("ENTRY", "skip")   # A2: лимит -10%, скип если нет отката
 POLL = os.environ.get("POLL", "5")
 SCAN = os.environ.get("SCAN", "60")
 
