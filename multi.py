@@ -14,10 +14,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import agent as AG
 from agent import Trade, live_prices
+import data as DATA
 
-QUEUE = os.path.join(HERE, "signals_in.jsonl")
-OFFSET = os.path.join(HERE, ".queue_offset_multi")
-INDEX = os.path.join(HERE, "strategies.json")
+# постоянное хранилище: на Railway смонтируй Volume и задай DATA_DIR=/data,
+# тогда данные вкладок переживают передеплои. Локально/без Volume — рядом с кодом.
+DATA_DIR = os.environ.get("DATA_DIR", HERE)
+os.makedirs(DATA_DIR, exist_ok=True)
+
+QUEUE = os.path.join(HERE, "signals_in.jsonl")           # транзиентная труба (рядом с producer)
+OFFSET = os.path.join(DATA_DIR, ".queue_offset_multi")
+INDEX = os.path.join(DATA_DIR, "strategies.json")
+FLOW = os.path.join(DATA_DIR, "flow_log.jsonl")          # intra-trade поток по токенам
 
 # ---- конфигурации (вкладки) ----
 STRATEGIES = [
@@ -39,15 +46,26 @@ STRATEGIES = [
      "dip": 0, "wait": 0, "tp": 0.15, "sl": 0.50, "window": 10, "entry": "market"},
     {"name": "mkt_tp15_w12", "label": "Рынок · TP+15% · 12м",
      "dip": 0, "wait": 0, "tp": 0.15, "sl": 0.50, "window": 12, "entry": "market"},
+    {"name": "mkt_tp20_w6",  "label": "Рынок · TP+20% · 6м",
+     "dip": 0, "wait": 0, "tp": 0.20, "sl": 0.50, "window": 6, "entry": "market"},
+    {"name": "mkt_tp20_w8",  "label": "Рынок · TP+20% · 8м",
+     "dip": 0, "wait": 0, "tp": 0.20, "sl": 0.50, "window": 8, "entry": "market"},
+    {"name": "mkt_tp25_w12", "label": "Рынок · TP+25% · 12м",
+     "dip": 0, "wait": 0, "tp": 0.25, "sl": 0.50, "window": 12, "entry": "market"},
+    {"name": "mkt_tp25_w20", "label": "Рынок · TP+25% · 20м",
+     "dip": 0, "wait": 0, "tp": 0.25, "sl": 0.50, "window": 20, "entry": "market"},
 ]
 
 STAKE = AG.STAKE_USD
 
 
 def paths(name):
-    return (os.path.join(HERE, f"paper_state_{name}.json"),
-            os.path.join(HERE, f"paper_trades_{name}.jsonl"),
-            os.path.join(HERE, f"events_{name}.jsonl"))
+    return (os.path.join(DATA_DIR, f"paper_state_{name}.json"),
+            os.path.join(DATA_DIR, f"paper_trades_{name}.jsonl"),
+            os.path.join(DATA_DIR, f"events_{name}.jsonl"))
+
+def reset_flag(name):
+    return os.path.join(DATA_DIR, f".reset_{name}")
 
 
 def load_journal(name):
@@ -136,6 +154,20 @@ def run(poll=None):
         except Exception: off = 0
 
     while True:
+        # 0) запросы сброса вкладок (веб пишет флаг .reset_<name>)
+        for name, st in S.items():
+            fl = reset_flag(name)
+            if os.path.exists(fl):
+                st["active"] = []; st["closed"] = []; st["events"] = []
+                state, trf, evf = paths(name)
+                for p in (trf, evf):
+                    try: open(p, "w").close()
+                    except Exception: pass
+                try: os.remove(fl)
+                except Exception: pass
+                write_state(st["cfg"], [], {}, [], [])
+                print(f"[reset] вкладка {name} сброшена", flush=True)
+
         # 1) ingest new signals -> сделка в каждой стратегии
         if os.path.exists(QUEUE):
             with open(QUEUE) as f:
@@ -165,10 +197,29 @@ def run(poll=None):
                 off = f.tell()
             with open(OFFSET, "w") as fo: fo.write(str(off))
 
-        # 2) общий опрос цен для всех активных
+        # 2) общий опрос — полные состояния (цена+ликвидность+поток) на всех
         all_cas = {t.ca for st in S.values() for t in st["active"]}
-        prices = live_prices(all_cas) if all_cas else {}
+        prices = {}
         now = time.time()
+        if all_cas:
+            try:
+                states = DATA.fetch_states(list(all_cas))
+            except Exception:
+                states = []
+            for s in states:
+                prices[s.address] = (float(s.price_usd or 0), float(s.liquidity_usd or 0))
+                # intra-trade поток: пишем раз на токен за тик (для будущей модели выхода)
+                try:
+                    with open(FLOW, "a") as f:
+                        f.write(json.dumps({
+                            "t": round(now, 1), "ca": s.address, "symbol": s.symbol,
+                            "price": s.price_usd, "liq": s.liquidity_usd,
+                            "vol_h1": getattr(s, "volume_h1", None),
+                            "buys_m5": getattr(s, "buys_m5", None),
+                            "sells_m5": getattr(s, "sells_m5", None),
+                        }, ensure_ascii=False) + "\n")
+                except Exception:
+                    pass
         for name, st in S.items():
             still = []
             for t in st["active"]:

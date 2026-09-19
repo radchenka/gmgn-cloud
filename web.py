@@ -9,7 +9,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, parse_qs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-INDEX = os.path.join(HERE, "strategies.json")
+DATA_DIR = os.environ.get("DATA_DIR", HERE)   # тот же, что у multi.py (Volume на Railway)
+INDEX = os.path.join(DATA_DIR, "strategies.json")
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8788"))
 TOKEN = os.environ.get("DASH_TOKEN", "")
@@ -26,7 +27,7 @@ def strategies():
 
 
 def read_state(name):
-    p = os.path.join(HERE, f"paper_state_{name}.json")
+    p = os.path.join(DATA_DIR, f"paper_state_{name}.json")
     if not os.path.exists(p):
         return dict(EMPTY, name=name)
     try:
@@ -85,12 +86,19 @@ tr.loss td{background:linear-gradient(90deg,var(--redbg),transparent 40%)}
 .mono{font-variant-numeric:tabular-nums}.dim{color:var(--dim)}
 .empty{color:var(--dim);padding:20px;text-align:center;border:1px dashed var(--line);border-radius:12px}
 .sub{font-size:12px;color:var(--dim)}
+.rbtn{margin-left:auto;background:var(--redbg);color:var(--red);border:1px solid #4a2020;
+border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer}
+.rbtn:hover{background:#3a1a1a}
+.tk{color:var(--acc);text-decoration:none;font-weight:700}.tk:hover{text-decoration:underline}
+.gm{font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:0 4px;margin-left:4px;text-decoration:none}
+.gm:hover{border-color:var(--acc);color:var(--acc)}
 </style></head><body><div class="wrap">
 <header>
   <h1>🧠 GMGN paper — мульти</h1>
   <span class="badge" id="conn"><span class="dot dead"></span><span id="conntx">…</span></span>
   <span class="badge" id="rule">—</span>
   <span class="badge sub" id="upd"></span>
+  <button id="reset" class="rbtn">🗑 Сброс вкладки</button>
 </header>
 <div class="tabs" id="tabs"></div>
 <div class="kpis" id="kpis"></div>
@@ -146,7 +154,7 @@ function render(s){
   const A=s.active||[];$('#nact').textContent=A.length?('· '+A.length):'';
   $('#active').innerHTML=!A.length?'<div class="empty">Открытых позиций нет</div>':
    '<table><thead><tr><th>Токен</th><th>Статус</th><th>Сигнал</th><th>Вход</th><th>Тек.</th><th>P&L</th><th>Возраст</th></tr></thead><tbody>'+
-   A.map(t=>{const w=t.state==='waiting_fill';return `<tr><td><b>${t.symbol}</b></td>
+   A.map(t=>{const w=t.state==='waiting_fill';return `<tr><td><a class="tk" href="https://gmgn.ai/sol/token/${t.ca}" target="_blank" rel="noopener">${t.symbol}</a><a class="gm" href="https://gmgn.ai/sol/token/${t.ca}" target="_blank" rel="noopener">GMGN↗</a></td>
      <td class="${w?'st-wait':'st-open'}">${w?'🆕 ждём':'🟢 в позиции'}</td>
      <td class="mono">${g(t.signal_price)}</td>
      <td class="mono">${t.entry_price?g(t.entry_price)+(t.filled_limit?' <span class="sub">лим</span>':' <span class="sub">рын</span>'):'—'}</td>
@@ -169,13 +177,20 @@ function render(s){
    '<table><thead><tr><th>Закрыто</th><th>Токен</th><th>Вход</th><th>Выход</th><th>Держал</th><th>%</th><th>P&L</th></tr></thead><tbody>'+
    L.map(t=>{const w=(t.pnl_usd||0)>0;const h=t.exit_ts&&t.entry_ts?((t.exit_ts-t.entry_ts)/60).toFixed(1)+'м':'—';
      return `<tr class="${w?'win':'loss'}"><td class="mono dim">${et(t.exit_ts)}</td>
-       <td><b>${t.symbol}</b></td><td class="mono">${g(t.entry_price)} <span class="sub">${t.filled_limit?'лим':'рын'}</span></td>
+       <td><a class="tk" href="https://gmgn.ai/sol/token/${t.ca}" target="_blank" rel="noopener">${t.symbol}</a><a class="gm" href="https://gmgn.ai/sol/token/${t.ca}" target="_blank" rel="noopener">↗</a></td><td class="mono">${g(t.entry_price)} <span class="sub">${t.filled_limit?'лим':'рын'}</span></td>
        <td><span class="tag t-${t.exit_reason}">${t.exit_reason}</span> <span class="mono dim">${g(t.exit_price)}</span></td>
        <td class="mono dim">${h}</td><td class="mono ${cls(t.net_ret)}">${pct(t.net_ret)}</td>
        <td class="mono ${cls(t.pnl_usd)}"><b>${money(t.pnl_usd||0)}</b></td></tr>`}).join('')+'</tbody></table>';
 }
 async function tick(){if(!SEL)return;try{const r=await fetch('/api/state'+qs({strategy:SEL}),{cache:'no-store'});render(await r.json());}
   catch(_){const d=$('#conn').querySelector('.dot');d.className='dot dead';$('#conntx').textContent='сервер недоступен';}}
+$('#reset').onclick=async()=>{
+  if(!SEL)return;
+  const lab=(document.querySelector('.tab.sel .lab')||{}).textContent||SEL;
+  if(!confirm('Сбросить статистику вкладки «'+lab+'»?\nУдалит её сделки и события. Другие вкладки не тронутся.'))return;
+  try{await fetch('/api/reset'+qs({strategy:SEL}),{method:'POST'});}catch(_){}
+  setTimeout(()=>{loadTabs();tick();},900);
+};
 async function loop(){await loadTabs();await tick();}
 loop();setInterval(loadTabs,5000);setInterval(tick,3000);
 </script></body></html>"""
@@ -206,6 +221,23 @@ class Handler(BaseHTTPRequestHandler):
             self._send(json.dumps(read_state(name), ensure_ascii=False), "application/json; charset=utf-8")
         elif path in ("/", "/index.html"):
             self._send(PAGE, "text/html; charset=utf-8")
+        else:
+            self.send_response(404); self.end_headers()
+
+    def do_POST(self):
+        if not self._authed():
+            self.send_response(401); self.end_headers(); return
+        u = urlsplit(self.path); q = parse_qs(u.query)
+        if u.path == "/api/reset":
+            name = q.get("strategy", [""])[0]
+            valid = {s["name"] for s in strategies()}
+            if name in valid:
+                try:
+                    open(os.path.join(DATA_DIR, f".reset_{name}"), "w").close()
+                    self._send(json.dumps({"ok": True}), "application/json"); return
+                except Exception:
+                    pass
+            self.send_response(400); self.end_headers()
         else:
             self.send_response(404); self.end_headers()
 
