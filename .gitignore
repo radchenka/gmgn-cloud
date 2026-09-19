@@ -8,3 +8,8 @@ signals_in.jsonl
 *.session
 .env
 .env.*
+paper_state_*.json
+paper_trades_*.jsonl
+events_*.jsonl
+strategies.json
+.queue_offset_multi

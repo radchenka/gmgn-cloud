@@ -38,11 +38,11 @@ signal.signal(signal.SIGTERM, shutdown)
 signal.signal(signal.SIGINT, shutdown)
 atexit.register(lambda: [p.terminate() for p in procs])
 
-print(f"[cloud] старт: producer(scan={SCAN}) + agent(rule={RULE} entry={ENTRY} poll={POLL}) + web",
+print(f"[cloud] старт: producer(scan={SCAN}) + multi (9 стратегий, poll={POLL}) + web",
       flush=True)
 spawn(["producer.py", SCAN])
 time.sleep(1)
-spawn(["agent.py", "--live", "--rule", RULE, "--entry", ENTRY, "--poll", POLL])
+spawn(["multi.py"])            # мульти-стратегийный движок (9 вкладок)
 time.sleep(1)
 
 # web в foreground, слушает 0.0.0.0:$PORT

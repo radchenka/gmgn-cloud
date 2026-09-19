@@ -147,6 +147,8 @@ class Trade:
                 self.state = "closed"; self.exit_reason = "CANCEL"; return True
             if not px_ok:
                 return False
+            if self.dip <= 0:                                   # market: вход сразу в момент сигнала
+                self._open_at(price, now, False); return False
             if price <= self.limit_price:                       # limit filled (got the dip)
                 self._open_at(self.limit_price, now, True)
             elif age_min >= self.wait_min:                       # no dip within wait window
