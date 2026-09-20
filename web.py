@@ -214,7 +214,12 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authed():
             self.send_response(401); self.end_headers(); self.wfile.write(b"unauthorized"); return
         u = urlsplit(self.path); path = u.path; q = parse_qs(u.query)
-        if path == "/api/strategies":
+        if path == "/api/health":
+            info = {"data_dir": DATA_DIR,
+                    "is_mounted_volume": os.path.ismount(DATA_DIR),
+                    "exists": os.path.isdir(DATA_DIR)}
+            self._send(json.dumps(info), "application/json; charset=utf-8")
+        elif path == "/api/strategies":
             self._send(json.dumps(strategies_summary(), ensure_ascii=False), "application/json; charset=utf-8")
         elif path == "/api/state":
             name = q.get("strategy", [""])[0]
